@@ -40,6 +40,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Configure git for private modules
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.MODULES_PAT }}@github.com/".insteadOf "https://github.com/"
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
