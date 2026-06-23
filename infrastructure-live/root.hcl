@@ -48,20 +48,3 @@ provider "aws" {
 }
 PROVIDER
 }
-
-# ---- Verzija Terraforma i providera ----
-generate "versions" {
-  path      = "versions.tf"
-  if_exists = "overwrite_terragrunt"
-  contents  = <<VERSIONS
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
-}
-VERSIONS
-}
