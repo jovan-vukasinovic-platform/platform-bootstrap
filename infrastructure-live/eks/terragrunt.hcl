@@ -29,8 +29,9 @@ inputs = {
   # Control plane ENI-ji i nodovi u privatnim subnetima (zahteva ukljucen NAT gateway!)
   subnet_ids = dependency.vpc.outputs.private_subnet_ids
 
-  instance_types = ["t3.medium"]
-  capacity_type  = "ON_DEMAND"
+  instance_types = ["c7i-flex.large"]
+  ami_type       = "AL2023_x86_64_STANDARD"
+  capacity_type  = "SPOT"
   desired_size   = 2
   min_size       = 1
   max_size       = 3
