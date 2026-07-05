@@ -1,0 +1,18 @@
+# ============================================================
+# Minimalna dev instalacija ArgoCD-a (bez HA, bez SSO).
+# UI pristup: kubectl port-forward svc/argocd-server -n argocd 8080:80
+# ============================================================
+
+configs:
+  params:
+    # Server bez TLS-a - UI-ju pristupamo iskljucivo port-forwardom,
+    # pa nam samopotpisani sertifikat i HTTPS redirekcija samo smetaju
+    server.insecure: true
+
+# SSO/eksterni login nije potreban - koristi se "admin" + initial password
+dex:
+  enabled: false
+
+# Slanje notifikacija (Slack i sl.) nam ne treba
+notifications:
+  enabled: false

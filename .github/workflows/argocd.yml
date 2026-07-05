@@ -1,0 +1,102 @@
+name: ArgoCD (Bootstrap)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Akcija'
+        required: true
+        type: choice
+        options: [install, uninstall]
+      confirm_uninstall:
+        description: 'Za uninstall ukucaj: argocd'
+        required: false
+        type: string
+
+env:
+  AWS_REGION: eu-central-1
+  CLUSTER_NAME: platform-eks
+  # Proveri najnoviju verziju: helm search repo argo/argo-cd --versions
+  ARGOCD_CHART_VERSION: "10.1.2"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  argocd:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Rola koja je kreirala klaster automatski ima cluster-admin
+      # (bootstrap_cluster_creator_admin_permissions = true u EKS modulu)
+      - name: Kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Helm install/upgrade ArgoCD
+        if: github.event.inputs.action == 'install'
+        run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo update
+          helm upgrade --install argocd argo/argo-cd \
+            --version ${{ env.ARGOCD_CHART_VERSION }} \
+            --namespace argocd --create-namespace \
+            --values argocd/values.yaml \
+            --wait --timeout 10m
+
+      # Org-wide credential sablon (repo-creds): pokriva SVE repoe organizacije,
+      # jer ApplicationSet generator cita i platform-bootstrap (katalog) i
+      # manifest repoe. MANIFEST_PAT mora imati Contents: Read na sve njih.
+      - name: Repo kredencijali za organizaciju
+        if: github.event.inputs.action == 'install'
+        run: |
+          kubectl -n argocd create secret generic repo-creds-org \
+            --from-literal=type=git \
+            --from-literal=url=https://github.com/jovan-vukasinovic-platform \
+            --from-literal=username=x-access-token \
+            --from-literal=password='${{ secrets.MANIFEST_PAT }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n argocd label secret repo-creds-org \
+            argocd.argoproj.io/secret-type=repo-creds --overwrite
+
+      # Katalog aplikacija: jedini manifest koji se primenjuje "rucno".
+      # ApplicationSet iz app-catalog/*.yaml generise sve ArgoCD aplikacije.
+      - name: ApplicationSet (app-catalog)
+        if: github.event.inputs.action == 'install'
+        run: kubectl apply -f argocd/app-catalog-set.yaml
+
+      - name: Provera potvrde za uninstall
+        if: github.event.inputs.action == 'uninstall'
+        run: |
+          if [[ "${{ github.event.inputs.confirm_uninstall }}" != "argocd" ]]; then
+            echo "::error::UNINSTALL ODBIJEN! Ukucaj: argocd"
+            exit 1
+          fi
+
+      # Brisanje ApplicationSet-a brise generisane aplikacije (ownerReferences),
+      # a njihovi finalizeri kaskadno brisu resurse - UKLJUCUJUCI NLB.
+      # Cekamo da aplikacije stvarno nestanu PRE gasenja ArgoCD-a, jer
+      # finalizere obradjuju ArgoCD kontroleri. Pokrece se PRE eks destroy-a!
+      - name: Uninstall ArgoCD
+        if: |
+          github.event.inputs.action == 'uninstall' &&
+          github.event.inputs.confirm_uninstall == 'argocd'
+        run: |
+          kubectl -n argocd delete applicationset app-catalog --ignore-not-found
+          for i in $(seq 1 60); do
+            n=$(kubectl -n argocd get applications --no-headers 2>/dev/null | wc -l)
+            [ "$n" -eq 0 ] && break
+            echo "Cekam brisanje $n aplikacija..."
+            sleep 15
+          done
+          helm uninstall argocd -n argocd || true
+          kubectl delete namespace argocd --ignore-not-found
