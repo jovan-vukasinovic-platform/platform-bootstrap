@@ -1,0 +1,5 @@
+name: library
+project: default
+repoURL: https://github.com/jovan-vukasinovic-platform/library-manifest.git
+targetRevision: main
+namespace: library

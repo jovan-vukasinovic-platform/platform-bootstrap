@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: app-catalog
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          # 1) STA je registrovano: katalog projekata
+          - git:
+              repoURL: https://github.com/jovan-vukasinovic-platform/platform-bootstrap.git
+              revision: main
+              pathParamPrefix: catalog
+              files:
+                - path: app-catalog/*.yaml
+          # 2) KAKO izgleda: za svaki projekat pronadji SVE chartove u njegovom repou
+          - git:
+              repoURL: '{{ .repoURL }}'
+              revision: '{{ .targetRevision }}'
+              directories:
+                - path: charts/*
+  template:
+    metadata:
+      name: '{{ .path.basename }}'
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .project }}'
+      source:
+        repoURL: '{{ .repoURL }}'
+        targetRevision: '{{ .targetRevision }}'
+        path: '{{ .path.path }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ .namespace }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
