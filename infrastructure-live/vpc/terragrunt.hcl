@@ -10,7 +10,7 @@ include "root" {
 }
 
 terraform {
-  source = "git::https://github.com/jovan-vukasinovic-platform/terraform-modules.git//modules/vpc?ref=v1.1.0"
+  source = "git::https://github.com/jovan-vukasinovic-platform/terraform-modules.git//modules/vpc?ref=main"
 }
 
 inputs = {
@@ -22,7 +22,18 @@ inputs = {
   public_subnet_cidrs  = ["10.0.0.0/20", "10.0.16.0/20"]
   private_subnet_cidrs = ["10.0.32.0/20", "10.0.48.0/20"]
 
-  enable_nat_gateway = false
+  # EKS nodovi zive u privatnim subnetima - NAT im je potreban za izlaz na internet
+  # (povlacenje image-a, addoni, ArgoCD -> GitHub itd.)
+  enable_nat_gateway = true
+  single_nat_gateway = true
+
+  # Tagovi po kojima EKS/AWS pronalazi subnete u koje sme da stavi load balancere
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = "1"
+  }
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = "1"
+  }
 
   tags = {
     Environment = "dev"
