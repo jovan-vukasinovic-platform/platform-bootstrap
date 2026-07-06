@@ -1,5 +1,5 @@
-name: ArgoCD (Bootstrap)
-run-name: "ArgoCD ${{ inputs.action == 'install' && 'INSTALL' || inputs.action == 'uninstall' && 'UNINSTALL' }} by @${{ github.actor }}"
+name: Platform Bootstrap (ArgoCD + Sealed Secrets)
+run-name: "Bootstrap ${{ inputs.action == 'install' && 'INSTALL' || inputs.action == 'uninstall' && 'UNINSTALL' }} by @${{ github.actor }}"
 
 on:
   workflow_dispatch:
@@ -17,15 +17,15 @@ on:
 env:
   AWS_REGION: eu-central-1
   CLUSTER_NAME: platform-eks
-  # Proveri najnoviju verziju: helm search repo argo/argo-cd --versions
-  ARGOCD_CHART_VERSION: "10.1.2"
+  ARGOCD_CHART_VERSION: "10.1.2" # helm search repo argo/argo-cd --versions
+  SEALED_SECRETS_CHART_VERSION: "2.18.6" # helm search repo sealed-secrets/sealed-secrets --versions
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  argocd:
+  bootstrap:
     runs-on: ubuntu-latest
 
     steps:
@@ -42,6 +42,17 @@ jobs:
       # (bootstrap_cluster_creator_admin_permissions = true u EKS modulu)
       - name: Kubeconfig
         run: aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Helm install/upgrade Sealed Secrets
+        if: github.event.inputs.action == 'install'
+        run: |
+          helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets
+          helm repo update
+          helm upgrade --install sealed-secrets sealed-secrets/sealed-secrets \
+            --version ${{ env.SEALED_SECRETS_CHART_VERSION }} \
+            --namespace kube-system \
+            --set-string fullnameOverride=sealed-secrets-controller \
+            --wait --timeout 5m
 
       - name: Helm install/upgrade ArgoCD
         if: github.event.inputs.action == 'install'
@@ -101,3 +112,9 @@ jobs:
           done
           helm uninstall argocd -n argocd || true
           kubectl delete namespace argocd --ignore-not-found
+
+      - name: Uninstall Sealed Secrets
+        if: |
+          github.event.inputs.action == 'uninstall' &&
+          github.event.inputs.confirm_uninstall == 'argocd'
+        run: helm uninstall sealed-secrets -n kube-system || true

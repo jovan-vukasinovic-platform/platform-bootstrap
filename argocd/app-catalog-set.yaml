@@ -34,6 +34,11 @@ spec:
         repoURL: '{{ .repoURL }}'
         targetRevision: '{{ .targetRevision }}'
         path: '{{ .path.path }}'
+        helm:
+          ignoreMissingValueFiles: true
+          valueFiles:
+            - values.yaml
+            - ../../environment/dev/{{ .path.basename }}.yaml
       destination:
         server: https://kubernetes.default.svc
         namespace: '{{ .namespace }}'
