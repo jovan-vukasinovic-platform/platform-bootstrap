@@ -10,7 +10,7 @@ include "root" {
 }
 
 terraform {
-  source = "git::https://github.com/jovan-vukasinovic-platform/terraform-modules.git//modules/vpc?ref=main"
+  source = "git::https://github.com/jovan-vukasinovic-platform/terraform-modules.git//modules/vpc?ref=v1.3.0"
 }
 
 inputs = {

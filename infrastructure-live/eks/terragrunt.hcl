@@ -9,7 +9,7 @@ include "root" {
 }
 
 terraform {
-  source = "git::https://github.com/jovan-vukasinovic-platform/terraform-modules.git//modules/eks?ref=main"
+  source = "git::https://github.com/jovan-vukasinovic-platform/terraform-modules.git//modules/eks?ref=v1.3.0"
 }
 
 dependency "vpc" {
