@@ -46,6 +46,7 @@ jobs:
       - name: Helm install/upgrade Sealed Secrets
         if: github.event.inputs.action == 'install'
         run: |
+          helm version --short
           helm repo add sealed-secrets https://bitnami.github.io/sealed-secrets
           helm repo update
           helm upgrade --install sealed-secrets sealed-secrets/sealed-secrets \
@@ -57,6 +58,7 @@ jobs:
       - name: Helm install/upgrade ArgoCD
         if: github.event.inputs.action == 'install'
         run: |
+          helm version --short
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
           helm upgrade --install argocd argo/argo-cd \
@@ -110,6 +112,7 @@ jobs:
             echo "Cekam brisanje $n aplikacija..."
             sleep 15
           done
+          helm version --short
           helm uninstall argocd -n argocd || true
           kubectl delete namespace argocd --ignore-not-found
 
@@ -117,4 +120,6 @@ jobs:
         if: |
           github.event.inputs.action == 'uninstall' &&
           github.event.inputs.confirm_uninstall == 'argocd'
-        run: helm uninstall sealed-secrets -n kube-system || true
+        run: |
+          helm version --short
+          helm uninstall sealed-secrets -n kube-system || true
